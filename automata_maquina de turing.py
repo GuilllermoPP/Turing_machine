@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import ttk
+import threading
 import time
 
 class TuringMachine:
@@ -64,33 +66,46 @@ class TuringMachineGUI(tk.Tk):
         self.speed_scale.pack()
 
         self.evaluated_symbol = tk.Label(self, text="")
-        self.evaluated_symbol.pack()
 
-        self.canvas = tk.Canvas(self, width=800, height=600)
-        self.canvas.pack()
-        self.visualize_turing_machine()
+        # Crear el scrollbar horizontal
+        self.horizontal_scrollbar = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.scroll_canvas)
+        self.horizontal_scrollbar.pack(fill=tk.X, side=tk.BOTTOM)
+
+        self.canvas_frame = tk.Frame(self)
+        self.canvas_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas = tk.Canvas(self.canvas_frame, width=800, height=600, xscrollcommand=self.horizontal_scrollbar.set)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas.bind("<Configure>", self.configure_canvas)
 
         self.running = False
+        self.turing_thread = None
+
+    def configure_canvas(self, event):
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+    def scroll_canvas(self, *args):
+        self.canvas.xview(*args)
 
     def run_turing_machine(self):
         input_word = self.input_entry.get()
         self.turing_machine.initialize_with_input(input_word)
 
+        if self.turing_thread and self.turing_thread.is_alive():
+            return
+
+        self.turing_thread = threading.Thread(target=self.turing_thread_function)
+        self.turing_thread.start()
+
+    def turing_thread_function(self):
         while self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_machine.step()
-            self.visualize_turing_machine()
-            self.update_idletasks()
-            time.sleep(0.5)
+            self.after(10, self.update_visualization)
+            time.sleep(0.5 / self.speed_scale.get())
 
-        
-
-    
-
-    def update_visualization(self, input_symbol):
-        speed = self.speed_scale.get()
-        self.visualize_turing_machine(input_symbol)
-        self.update_idletasks()
-        time.sleep(0.5 / speed)
+    def update_visualization(self):
+        self.visualize_turing_machine()
 
     def visualize_turing_machine(self):
         self.clear_canvas()
@@ -123,8 +138,36 @@ class TuringMachineGUI(tk.Tk):
             self.draw_transition(current_state, new_state, transition_label, color)
 
     def draw_tape(self):
-        tape_text = "Cinta: " + "".join(self.turing_machine.tape)
-        self.canvas.create_text(400, 500, text=tape_text, font=('Helvetica', 12), anchor=tk.CENTER)
+        tape_text = "".join(self.turing_machine.tape)
+        tape_length = len(tape_text)
+        square_size = 40
+        start_x = 400 - (tape_length * square_size) // 2
+        start_y = 100
+
+        # Obtener el desplazamiento horizontal
+        x_offset = self.horizontal_scrollbar.get()[0] * tape_length * square_size
+
+        for i, char in enumerate(tape_text):
+            x = start_x + i * square_size - x_offset
+            y = start_y
+            self.draw_square(x, y, square_size, char)
+
+        self.draw_head(x_offset)
+
+    def draw_square(self, x, y, size, char):
+        self.canvas.create_rectangle(x, y, x + size, y + size, outline='black')
+        self.canvas.create_text(x + size // 2, y + size // 2, text=char, font=('Helvetica', 12), anchor=tk.CENTER)
+
+    def draw_head(self, x_offset):
+        head_position = self.turing_machine.head_position
+        tape_length = len(self.turing_machine.tape)
+        square_size = 40
+        start_x = 400 - (tape_length * square_size) // 2
+
+        # Obtener la posición del cabezal ajustada por el desplazamiento horizontal
+        x = start_x + head_position * square_size - x_offset + 20
+        y = 80
+        self.canvas.create_polygon(x, y, x - 10, y - 20, x + 10, y - 20, fill='red')
 
     def draw_transition(self, current_state, new_state, label, color):
         x1, y1 = self.get_node_coordinates(current_state)
@@ -157,17 +200,7 @@ class TuringMachineGUI(tk.Tk):
         y = 300
         return x, y
 
-    def run(self):
-        self.running = True
-        while self.running:
-            try:
-                self.update_idletasks()
-                self.update()
-                time.sleep(0.01)
-            except tk.TclError:
-                break
-
 if __name__ == "__main__":
     turing_machine = TuringMachine()
     app = TuringMachineGUI(turing_machine)
-    app.run()
+    app.mainloop()
