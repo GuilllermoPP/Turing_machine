@@ -49,7 +49,7 @@ class TuringMachineGUI(tk.Tk):
 
         self.turing_machine = turing_machine
 
-        self.input_label = tk.Label(self, text="Ingrese una expresión para evaluar si es Palíndromo de longitud par")
+        self.input_label = tk.Label(self, text="Ingrese una expresión compuesta por 'a' y 'b' para convertir todos los simbolos en 'a'")
         self.input_label.pack()
 
         self.input_entry = tk.Entry(self)
