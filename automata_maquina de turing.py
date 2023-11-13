@@ -3,6 +3,7 @@ from tkinter import ttk
 import threading
 import time
 
+
 class TuringMachine:
     def __init__(self):
         self.states = {'q0', 'q1', 'q2'}
@@ -10,7 +11,6 @@ class TuringMachine:
             ('q0', 'a'): ('q0', 'a', 'R'),
             ('q0', 'b'): ('q0', 'a', 'R'),
             ('q0', '_'): ('q1', '_', 'L'),
-            ('q1', 'b'): ('q1', 'a', 'L'),
             ('q1', 'a'): ('q1', 'a', 'L'),
             ('q1', '_'): ('q2', '_', 'R'),
         }
@@ -78,7 +78,7 @@ class TuringMachineGUI(tk.Tk):
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         self.canvas.bind("<Configure>", self.configure_canvas)
-
+        self.visualize_turing_machine()
         self.running = False
         self.turing_thread = None
 
@@ -141,32 +141,48 @@ class TuringMachineGUI(tk.Tk):
         tape_text = "".join(self.turing_machine.tape)
         tape_length = len(tape_text)
         square_size = 40
-        start_x = 400 - (tape_length * square_size) // 2
-        start_y = 100
+        empty_squares = 20
 
-        # Obtener el desplazamiento horizontal
-        x_offset = self.horizontal_scrollbar.get()[0] * tape_length * square_size
+        # Obtener la posición del cabezal
+        head_position = self.turing_machine.head_position
 
+        # Calcular el inicio de la cinta en función de la posición del cabezal
+        start_x = 400 - head_position * square_size
+
+        # Dibujar cuadrados vacíos a la izquierda
+        for i in range(empty_squares):
+            x = start_x - (empty_squares - i) * square_size
+            y = 100
+            self.draw_square(x, y, square_size, '')
+
+        # Dibujar la cinta
         for i, char in enumerate(tape_text):
-            x = start_x + i * square_size - x_offset
-            y = start_y
+            x = start_x + i * square_size
+            y = 100
             self.draw_square(x, y, square_size, char)
 
-        self.draw_head(x_offset)
+        # Dibujar cuadrados vacíos a la derecha
+        for i in range(empty_squares):
+            x = start_x + (tape_length + i) * square_size
+            y = 100
+            self.draw_square(x, y, square_size, '')
+
+        # Dibujar el cabezal en una posición fija en la parte superior
+        self.draw_head_fixed_position()
+
+        # Actualizar manualmente la región de desplazamiento del lienzo
+        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+
+        # Llamar al método configure después de actualizar el contenido de la cinta
+        self.horizontal_scrollbar.configure(command=self.scroll_canvas)
 
     def draw_square(self, x, y, size, char):
         self.canvas.create_rectangle(x, y, x + size, y + size, outline='black')
         self.canvas.create_text(x + size // 2, y + size // 2, text=char, font=('Helvetica', 12), anchor=tk.CENTER)
 
-    def draw_head(self, x_offset):
-        head_position = self.turing_machine.head_position
-        tape_length = len(self.turing_machine.tape)
-        square_size = 40
-        start_x = 400 - (tape_length * square_size) // 2
-
-        # Obtener la posición del cabezal ajustada por el desplazamiento horizontal
-        x = start_x + head_position * square_size - x_offset + 20
-        y = 80
+    def draw_head_fixed_position(self):
+        x = 420
+        y = 100
         self.canvas.create_polygon(x, y, x - 10, y - 20, x + 10, y - 20, fill='red')
 
     def draw_transition(self, current_state, new_state, label, color):
