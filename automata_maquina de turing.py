@@ -58,8 +58,24 @@ class TuringMachineGUI(tk.Tk):
         self.result_label = tk.Label(self, text="")
         self.result_label.pack()
 
-        self.evaluate_button = tk.Button(self, text="Evaluar", command=self.run_turing_machine)
-        self.evaluate_button.pack()
+        self.result_label = tk.Label(self, text="")
+        self.result_label.pack()
+
+        # Buttons organized horizontally
+        self.button_frame = tk.Frame(self)
+        self.button_frame.pack()
+
+        self.enter_button = tk.Button(self.button_frame, text="Enter", command=self.enter_word)
+        self.enter_button.pack(side=tk.LEFT)
+
+        self.step_button = tk.Button(self.button_frame, text="Step", command=self.step)
+        self.step_button.pack(side=tk.LEFT)
+
+        self.run_button = tk.Button(self.button_frame, text="Run", command=self.run)
+        self.run_button.pack(side=tk.LEFT)
+
+        self.pause_button = tk.Button(self.button_frame, text="Pause", command=self.pause)
+        self.pause_button.pack(side=tk.LEFT)
 
         self.speed_scale = tk.Scale(self, label="Velocidad", from_=1, to=10, orient=tk.HORIZONTAL)
         self.speed_scale.set(5)
@@ -81,6 +97,7 @@ class TuringMachineGUI(tk.Tk):
         self.visualize_turing_machine()
         self.running = False
         self.turing_thread = None
+        self.paused = False  # Variable de control para pausar el hilo
 
     def configure_canvas(self, event):
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
@@ -88,21 +105,39 @@ class TuringMachineGUI(tk.Tk):
     def scroll_canvas(self, *args):
         self.canvas.xview(*args)
 
-    def run_turing_machine(self):
+    def enter_word(self):
         input_word = self.input_entry.get()
         self.turing_machine.initialize_with_input(input_word)
+        self.visualize_turing_machine()
+        self.result_label.config(text="Se ha ingresado una nueva palabra.")
 
-        if self.turing_thread and self.turing_thread.is_alive():
-            return
+    def step(self):
+        if self.turing_machine.current_state != self.turing_machine.accept_state :
+            self.turing_machine.step()
+            self.visualize_turing_machine()
+            self.result_label.config(text="Se ha saltado un simbolo")
 
-        self.turing_thread = threading.Thread(target=self.turing_thread_function)
-        self.turing_thread.start()
+    def run(self):
+        if self.turing_machine.current_state != self.turing_machine.accept_state:
+            self.turing_thread = threading.Thread(target=self.turing_thread_function)
+            self.turing_thread.start()
+            self.result_label.config(text="")
+
+    def pause(self):
+        self.paused = True
+        self.result_label.config(text="Pausado")
+
+    def resume(self):
+        self.paused = False
 
     def turing_thread_function(self):
-        while self.turing_machine.current_state != self.turing_machine.accept_state:
+        while not self.paused and self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_machine.step()
             self.after(10, self.update_visualization)
             time.sleep(0.5 / self.speed_scale.get())
+            
+            if self.turing_machine.current_state == self.turing_machine.accept_state:
+                self.result_label.config(text="Se ha cambiado toda la palabra.")
 
     def update_visualization(self):
         self.visualize_turing_machine()
