@@ -68,7 +68,7 @@ class TuringMachineGUI(tk.Tk):
         self.enter_button = tk.Button(self.button_frame, text="Enter", command=self.enter_word)
         self.enter_button.pack(side=tk.LEFT)
 
-        self.step_button = tk.Button(self.button_frame, text="Step", command=self.step)
+        self.step_button = tk.Button(self.button_frame, text="Step", command=self.step_tape)
         self.step_button.pack(side=tk.LEFT)
 
         self.run_button = tk.Button(self.button_frame, text="Run", command=self.run)
@@ -111,13 +111,14 @@ class TuringMachineGUI(tk.Tk):
         self.visualize_turing_machine()
         self.result_label.config(text="Se ha ingresado una nueva palabra.")
 
-    def step(self):
+    def step_tape(self):
         if self.turing_machine.current_state != self.turing_machine.accept_state :
             self.turing_machine.step()
             self.visualize_turing_machine()
             self.result_label.config(text="Se ha saltado un simbolo")
 
     def run(self):
+        self.paused = False
         if self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_thread = threading.Thread(target=self.turing_thread_function)
             self.turing_thread.start()
