@@ -112,10 +112,19 @@ class TuringMachineGUI(tk.Tk):
         self.result_label.config(text="Se ha ingresado una nueva palabra.")
 
     def step_tape(self):
-        if self.turing_machine.current_state != self.turing_machine.accept_state :
+        if self.turing_machine.current_state != self.turing_machine.accept_state:
+            self.move_tape(10, 3)  # Mover la cinta en 3 pasos de 10 unidades
             self.turing_machine.step()
+            self.move_tape(-10, 3)  # Restaurar la posición original en 3 pasos de 10 unidades
             self.visualize_turing_machine()
-            self.result_label.config(text="Se ha saltado un simbolo")
+            self.result_label.config(text="Se ha saltado un símbolo")
+
+    def move_tape(self, delta, steps):
+        for _ in range(steps):
+            self.turing_machine.head_position += delta
+            self.visualize_turing_machine()
+            self.update()
+            time.sleep(0.25 / self.speed_scale.get())
 
     def run(self):
         self.paused = False
