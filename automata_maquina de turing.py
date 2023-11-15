@@ -176,7 +176,7 @@ class TuringMachineGUI(tk.Tk):
         while not self.paused and self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_machine.step()
             self.after(10, self.update_visualization)
-            time.sleep(0.5 / self.speed_scale.get())
+            time.sleep(3 / self.speed_scale.get())
 
             if self.turing_machine.current_state == self.turing_machine.accept_state:
                 self.result_label_text.set(self.translate("The entire word has been changed."))
