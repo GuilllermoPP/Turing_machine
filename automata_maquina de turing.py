@@ -122,7 +122,7 @@ class TuringMachineGUI(tk.Tk):
         selected_language = list(self.languages.keys())[list(self.languages.values()).index(self.language_selector.get())]
         self.current_language = selected_language
         self.update_ui_language()
-        self.speak_text(self.translate("Enter an expression composed of 'a' and 'b' to convert all symbols to 'a'"))
+        
 
     def update_ui_language(self):
         self.language_label.config(text=self.translate("Select a language:"))
@@ -146,40 +146,41 @@ class TuringMachineGUI(tk.Tk):
 
     def enter_word(self):
         input_word = self.input_entry.get()
-        translated_word = self.translate(input_word)
-        self.turing_machine.initialize_with_input(translated_word)
-
-        if self.turing_machine.current_state == 'rejected':
-            self.turing_machine.current_state = 'q0'
+        
+        self.turing_machine.initialize_with_input(input_word)
 
         self.visualize_turing_machine()
         self.result_label_text.set(self.translate("A new word has been entered."))
+        self.speak_text_threaded(self.result_label_text.get())  # Utiliza el sintetizador de voz en result_label_text
 
     def step_tape(self):
         if self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_machine.step()
             self.visualize_turing_machine()
             self.result_label_text.set(self.translate("A symbol has been processed"))
+            self.speak_text_threaded(self.result_label_text.get())  # Utiliza el sintetizador de voz en result_label_text
 
     def run(self):
         self.paused = False
         if self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_thread = threading.Thread(target=self.turing_thread_function)
             self.turing_thread.start()
-            self.result_label_text.set("")
+            
 
     def pause(self):
         self.paused = True
         self.result_label_text.set(self.translate("Paused"))
+        self.speak_text_threaded(self.result_label_text.get())  # Utiliza el sintetizador de voz en result_label_text
 
     def turing_thread_function(self):
         while not self.paused and self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_machine.step()
             self.after(10, self.update_visualization)
-            time.sleep(5 / self.speed_scale.get())
+            time.sleep(0.5 / self.speed_scale.get())
 
             if self.turing_machine.current_state == self.turing_machine.accept_state:
                 self.result_label_text.set(self.translate("The entire word has been changed."))
+                self.speak_text_threaded(self.result_label_text.get()) # Utiliza el sintetizador de voz en result_label_text
 
     def update_visualization(self):
         self.visualize_turing_machine()
@@ -284,7 +285,10 @@ class TuringMachineGUI(tk.Tk):
 
     def speak_text(self, text):
         self.engine.say(text)
-        self.engine.runAndWait()
+        self.after(10, self.engine.runAndWait)
+
+    def speak_text_threaded(self, text):
+        self.after(10, lambda: self.speak_text(text))
 
 if __name__ == "__main__":
     turing_machine = TuringMachine()
