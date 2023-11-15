@@ -3,7 +3,6 @@ from tkinter import ttk
 import threading
 import time
 
-
 class TuringMachine:
     def __init__(self):
         self.states = {'q0', 'q1', 'q2'}
@@ -49,7 +48,7 @@ class TuringMachineGUI(tk.Tk):
 
         self.turing_machine = turing_machine
 
-        self.input_label = tk.Label(self, text="Ingrese una expresión compuesta por 'a' y 'b' para convertir todos los simbolos en 'a'")
+        self.input_label = tk.Label(self, text="Ingrese una expresión compuesta por 'a' y 'b' para convertir todos los símbolos en 'a'")
         self.input_label.pack()
 
         self.input_entry = tk.Entry(self)
@@ -61,20 +60,20 @@ class TuringMachineGUI(tk.Tk):
         self.result_label = tk.Label(self, text="")
         self.result_label.pack()
 
-        # Buttons organized horizontally
+        # Botones organizados horizontalmente
         self.button_frame = tk.Frame(self)
         self.button_frame.pack()
 
-        self.enter_button = tk.Button(self.button_frame, text="Enter", command=self.enter_word)
+        self.enter_button = tk.Button(self.button_frame, text="Ingresar", command=self.enter_word)
         self.enter_button.pack(side=tk.LEFT)
 
-        self.step_button = tk.Button(self.button_frame, text="Step", command=self.step_tape)
+        self.step_button = tk.Button(self.button_frame, text="Paso", command=self.step_tape)
         self.step_button.pack(side=tk.LEFT)
 
-        self.run_button = tk.Button(self.button_frame, text="Run", command=self.run)
+        self.run_button = tk.Button(self.button_frame, text="Ejecutar", command=self.run)
         self.run_button.pack(side=tk.LEFT)
 
-        self.pause_button = tk.Button(self.button_frame, text="Pause", command=self.pause)
+        self.pause_button = tk.Button(self.button_frame, text="Pausar", command=self.pause)
         self.pause_button.pack(side=tk.LEFT)
 
         self.speed_scale = tk.Scale(self, label="Velocidad", from_=1, to=10, orient=tk.HORIZONTAL)
@@ -124,7 +123,7 @@ class TuringMachineGUI(tk.Tk):
             self.turing_machine.head_position += delta
             self.visualize_turing_machine()
             self.update()
-            time.sleep(0.25 / self.speed_scale.get())
+            time.sleep(5 / self.speed_scale.get())
 
     def run(self):
         self.paused = False
@@ -144,7 +143,7 @@ class TuringMachineGUI(tk.Tk):
         while not self.paused and self.turing_machine.current_state != self.turing_machine.accept_state:
             self.turing_machine.step()
             self.after(10, self.update_visualization)
-            time.sleep(0.5 / self.speed_scale.get())
+            time.sleep(5 / self.speed_scale.get())
             
             if self.turing_machine.current_state == self.turing_machine.accept_state:
                 self.result_label.config(text="Se ha cambiado toda la palabra.")
@@ -265,4 +264,3 @@ if __name__ == "__main__":
     turing_machine = TuringMachine()
     app = TuringMachineGUI(turing_machine)
     app.mainloop()
-#prueba
