@@ -265,3 +265,4 @@ if __name__ == "__main__":
     turing_machine = TuringMachine()
     app = TuringMachineGUI(turing_machine)
     app.mainloop()
+#prueba
