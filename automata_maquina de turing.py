@@ -3,6 +3,7 @@ from tkinter import ttk
 from googletrans import Translator
 import threading
 import time
+import pyttsx3
 
 class TuringMachine:
     def __init__(self):
@@ -52,6 +53,8 @@ class TuringMachineGUI(tk.Tk):
         self.current_language = "en"
         self.languages = {"en": "English", "es": "Spanish", "fr": "French"}
 
+        self.init_text_to_speech()
+
         # Cuadro de lista (Combobox) para el idioma
         self.language_label = ttk.Label(self, text=self.translate("Select a language:"))
         self.language_label.pack()
@@ -64,7 +67,7 @@ class TuringMachineGUI(tk.Tk):
 
         # Etiqueta e entrada para la expresión
         self.input_label_text = tk.StringVar()
-        self.input_label = tk.Label(self, textvariable=self.input_label_text)
+        self.input_label = tk.Label(self, text=self.translate("Enter an expression composed of 'a' and 'b' to convert all symbols to 'a'"))
         self.input_label.pack()
 
         self.input_entry = tk.Entry(self)
@@ -97,6 +100,9 @@ class TuringMachineGUI(tk.Tk):
         self.speed_scale.set(5)
         self.speed_scale.pack()
 
+        # Etiqueta para el símbolo evaluado
+        self.evaluated_symbol = tk.Label(self, text="")
+
         # Crear el scrollbar horizontal
         self.horizontal_scrollbar = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.scroll_canvas)
         self.horizontal_scrollbar.pack(fill=tk.X, side=tk.BOTTOM)
@@ -116,11 +122,18 @@ class TuringMachineGUI(tk.Tk):
         self.turing_thread = None
         self.paused = False  # Variable de control para pausar el hilo
 
+    def init_text_to_speech(self):
+        # Inicializa el motor de texto a voz
+        self.engine = pyttsx3.init()
+
     def change_language(self, event):
         # Cambia el idioma actual en respuesta a la selección del usuario
         selected_language = list(self.languages.keys())[list(self.languages.values()).index(self.language_selector.get())]
         self.current_language = selected_language
         self.update_ui_language()
+
+        # Solicita entrada en el idioma seleccionado
+        self.speak_text(self.translate("Enter an expression composed of 'a' and 'b' to convert all symbols to 'a'"))
 
     def update_ui_language(self):
         # Actualiza la interfaz de usuario con el idioma seleccionado
@@ -288,6 +301,11 @@ class TuringMachineGUI(tk.Tk):
         x = 100 + state_number * 150
         y = 300
         return x, y
+
+    def speak_text(self, text):
+        # Utiliza el motor de texto a voz para leer el texto
+        self.engine.say(text)
+        self.engine.runAndWait()
 
 if __name__ == "__main__":
     turing_machine = TuringMachine()
