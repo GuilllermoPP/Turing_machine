@@ -157,18 +157,9 @@ class TuringMachineGUI(tk.Tk):
 
     def step_tape(self):
         if self.turing_machine.current_state != self.turing_machine.accept_state:
-            self.move_tape(10, 3)
             self.turing_machine.step()
-            self.move_tape(-10, 3)
             self.visualize_turing_machine()
-            self.result_label_text.set(self.translate("A symbol has been skipped"))
-
-    def move_tape(self, delta, steps):
-        for _ in range(steps):
-            self.turing_machine.head_position += delta
-            self.visualize_turing_machine()
-            self.update()
-            time.sleep(5 / self.speed_scale.get())
+            self.result_label_text.set(self.translate("A symbol has been processed"))
 
     def run(self):
         self.paused = False
