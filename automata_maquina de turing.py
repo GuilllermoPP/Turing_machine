@@ -68,8 +68,7 @@ class TuringMachineGUI(tk.Tk):
         self.language_selector.pack()
         self.language_selector.bind("<<ComboboxSelected>>", self.change_language)
 
-        self.input_label_text = tk.StringVar()
-        self.input_label = tk.Label(self, textvariable=self.input_label_text)
+        self.input_label = tk.Label(self, text=self.translate("Enter an expression composed of 'a' and 'b' to convert all symbols to 'a'"))
         self.input_label.pack()
 
         self.input_entry = tk.Entry(self)
