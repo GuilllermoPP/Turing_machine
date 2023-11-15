@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
-from googletrans import Translator  # Importa el traductor de Google
+from googletrans import Translator
 import threading
 import time
 
@@ -49,20 +48,22 @@ class TuringMachineGUI(tk.Tk):
         self.geometry("800x600")
 
         self.turing_machine = turing_machine
+        self.translator = Translator()
+        self.current_language = "en"
+        self.languages = {"en": "English", "es": "Spanish", "fr": "French"}
 
         # Cuadro de lista (Combobox) para el idioma
-        self.language_label_text = tk.StringVar()
-        self.language_label_text.set("Seleccione el idioma de la expresión:")
-        self.language_label = tk.Label(self, textvariable=self.language_label_text)
+        self.language_label = ttk.Label(self, text=self.translate("Select a language:"))
         self.language_label.pack()
 
-        self.language_combobox = ttk.Combobox(self, values=['es', 'en', 'fr', 'de', 'ja', 'ko'])
-        self.language_combobox.set('es')  # Establecer el valor predeterminado a español
-        self.language_combobox.pack()
+        # Crea un cuadro combinado para seleccionar el idioma
+        self.language_selector = ttk.Combobox(self, values=list(self.languages.values()), state="readonly")
+        self.language_selector.current(0)
+        self.language_selector.pack()
+        self.language_selector.bind("<<ComboboxSelected>>", self.change_language)
 
         # Etiqueta e entrada para la expresión
         self.input_label_text = tk.StringVar()
-        self.input_label_text.set("Ingrese una expresión compuesta por 'a' y 'b' para convertir todos los símbolos en 'a'")
         self.input_label = tk.Label(self, textvariable=self.input_label_text)
         self.input_label.pack()
 
@@ -79,25 +80,22 @@ class TuringMachineGUI(tk.Tk):
         self.button_frame = tk.Frame(self)
         self.button_frame.pack()
 
-        self.enter_button = tk.Button(self.button_frame, text="Ingresar", command=self.enter_word)
+        self.enter_button = tk.Button(self.button_frame, text=self.translate("Enter Word"), command=self.enter_word)
         self.enter_button.pack(side=tk.LEFT)
 
-        self.step_button = tk.Button(self.button_frame, text="Paso", command=self.step_tape)
+        self.step_button = tk.Button(self.button_frame, text=self.translate("Step"), command=self.step_tape)
         self.step_button.pack(side=tk.LEFT)
 
-        self.run_button = tk.Button(self.button_frame, text="Ejecutar", command=self.run)
+        self.run_button = tk.Button(self.button_frame, text=self.translate("Execute"), command=self.run)
         self.run_button.pack(side=tk.LEFT)
 
-        self.pause_button = tk.Button(self.button_frame, text="Pausar", command=self.pause)
+        self.pause_button = tk.Button(self.button_frame, text=self.translate("Stop"), command=self.pause)
         self.pause_button.pack(side=tk.LEFT)
 
         # Escala para la velocidad
-        self.speed_scale = tk.Scale(self, label="Velocidad", from_=1, to=10, orient=tk.HORIZONTAL)
+        self.speed_scale = tk.Scale(self, label=self.translate("Speed"), from_=1, to=10, orient=tk.HORIZONTAL)
         self.speed_scale.set(5)
         self.speed_scale.pack()
-
-        # Etiqueta para el símbolo evaluado
-        self.evaluated_symbol = tk.Label(self, text="")
 
         # Crear el scrollbar horizontal
         self.horizontal_scrollbar = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.scroll_canvas)
@@ -117,11 +115,25 @@ class TuringMachineGUI(tk.Tk):
         self.running = False
         self.turing_thread = None
         self.paused = False  # Variable de control para pausar el hilo
-        
-        self.translator = Translator()
 
-        # Actualizar idioma al inicio
-        self.update_language()
+    def change_language(self, event):
+        # Cambia el idioma actual en respuesta a la selección del usuario
+        selected_language = list(self.languages.keys())[list(self.languages.values()).index(self.language_selector.get())]
+        self.current_language = selected_language
+        self.update_ui_language()
+
+    def update_ui_language(self):
+        # Actualiza la interfaz de usuario con el idioma seleccionado
+        self.language_label.config(text=self.translate("Select a language:"))
+        self.input_label.config(text=self.translate("Enter an expression composed of 'a' and 'b' to convert all symbols to 'a'"))
+        self.enter_button.config(text=self.translate("Enter Word"))
+        self.step_button.config(text=self.translate("Step"))
+        self.run_button.config(text=self.translate("Execute"))
+        self.pause_button.config(text=self.translate("Stop"))
+
+        # Traduce la etiqueta de la escala de velocidad
+        speed_label_text = self.translate("Speed")
+        self.speed_scale.config(label=speed_label_text)
 
     def configure_canvas(self, event):
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
@@ -129,23 +141,17 @@ class TuringMachineGUI(tk.Tk):
     def scroll_canvas(self, *args):
         self.canvas.xview(*args)
 
-    def translate_text(self, text, source='auto', target='en'):
-        translation = self.translator.translate(text, src=source, dest=target)
+    def translate(self, text):
+        # Traduce el texto al idioma actual
+        translation = self.translator.translate(text, dest=self.current_language)
         return translation.text
 
-    def update_language(self):
-        language = self.language_combobox.get()
-        self.language_label_text.set(self.translate_text("Seleccione el idioma de la expresión:", source='en', target=language))
-        self.input_label_text.set(self.translate_text("Ingrese una expresión compuesta por 'a' y 'b' para convertir todos los símbolos en 'a'", source='en', target=language))
-        self.result_label_text.set("")
-
     def enter_word(self):
-        language = self.language_combobox.get()
         input_word = self.input_entry.get()
-        translated_word = self.translate_text(input_word, source=language, target='en')
+        translated_word = self.translate(input_word)
         self.turing_machine.initialize_with_input(translated_word)
         self.visualize_turing_machine()
-        self.result_label_text.set(self.translate_text("Se ha ingresado una nueva palabra.", source='en', target=language))
+        self.result_label_text.set(self.translate("A new word has been entered."))
 
     def step_tape(self):
         if self.turing_machine.current_state != self.turing_machine.accept_state:
@@ -153,7 +159,7 @@ class TuringMachineGUI(tk.Tk):
             self.turing_machine.step()
             self.move_tape(-10, 3)  # Restaurar la posición original en 3 pasos de 10 unidades
             self.visualize_turing_machine()
-            self.result_label_text.set(self.translate_text("Se ha saltado un símbolo", source='en', target=language))
+            self.result_label_text.set(self.translate("A symbol has been skipped"))
 
     def move_tape(self, delta, steps):
         for _ in range(steps):
@@ -171,10 +177,7 @@ class TuringMachineGUI(tk.Tk):
 
     def pause(self):
         self.paused = True
-        self.result_label_text.set(self.translate_text("Pausado", source='en', target=language))
-
-    def resume(self):
-        self.paused = False
+        self.result_label_text.set(self.translate("Paused"))
 
     def turing_thread_function(self):
         while not self.paused and self.turing_machine.current_state != self.turing_machine.accept_state:
@@ -183,7 +186,7 @@ class TuringMachineGUI(tk.Tk):
             time.sleep(5 / self.speed_scale.get())
 
             if self.turing_machine.current_state == self.turing_machine.accept_state:
-                self.result_label_text.set(self.translate_text("Se ha cambiado toda la palabra.", source='en', target=language))
+                self.result_label_text.set(self.translate("The entire word has been changed."))
 
     def update_visualization(self):
         self.visualize_turing_machine()
