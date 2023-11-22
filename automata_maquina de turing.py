@@ -1,296 +1,204 @@
 import tkinter as tk
 from tkinter import ttk
+from tkinter import scrolledtext
 from googletrans import Translator
-import threading
-import time
+import ply.yacc as yacc
 import pyttsx3
+from lexer import lexer
 
-class TuringMachine:
-    def __init__(self):
-        # Definición de estados y transiciones de la Máquina de Turing
-        self.states = {'q0', 'q1', 'q2'}
-        self.transitions = {
-            ('q0', 'a'): ('q0', 'a', 'R'),
-            ('q0', 'b'): ('q0', 'a', 'R'),
-            ('q0', '_'): ('q1', '_', 'L'),
-            ('q1', 'a'): ('q1', 'a', 'L'),
-            ('q1', '_'): ('q2', '_', 'R'),
-        }
-        self.accept_state = 'q2'
-        self.current_state = 'q0'
-        self.tape = ['_']
-        self.head_position = 0
+class SimpleInterpreterGUI:
+    def __init__(self, master):
+        self.master = master
+        master.title("Simple Interpreter GUI")
 
-    def initialize_with_input(self, input_string):
-        # Inicialización de la cinta con la entrada proporcionada
-        self.tape = ['_'] + list(input_string) + ['_']
-        self.current_state = 'q0'
-        self.head_position = 1
-
-    def step(self):
-        # Ejecución de un paso en la Máquina de Turing
-        current_symbol = self.tape[self.head_position]
-        if (self.current_state, current_symbol) not in self.transitions:
-            self.current_state = 'rejected'  # Cambiado a 'rejected' para indicar el rechazo
-            return
-
-        new_state, write_symbol, move_direction = self.transitions[(self.current_state, current_symbol)]
-        self.tape[self.head_position] = write_symbol
-
-        if move_direction == 'R':
-            self.head_position += 1
-        elif move_direction == 'L':
-            self.head_position -= 1
-
-        self.current_state = new_state
-
-class TuringMachineGUI(tk.Tk):
-    def __init__(self, turing_machine):
-        super().__init__()
-
-        # Configuración de la interfaz gráfica
-        self.title("Máquina de Turing")
-        self.geometry("800x600")
-
-        self.turing_machine = turing_machine
         self.translator = Translator()
         self.current_language = "en"
         self.languages = {"en": "English", "es": "Spanish", "fr": "French"}
 
-        self.init_text_to_speech()
+        self.language_var = tk.StringVar()
+        self.language_var.set("en")
 
-        # Componentes de la interfaz
-        self.language_label = ttk.Label(self, text=self.translate("Select a language:"))
+        self.language_label = ttk.Label(master, text=self.translate_text("Select a language:"))
         self.language_label.pack()
 
-        self.language_selector = ttk.Combobox(self, values=list(self.languages.values()), state="readonly")
+        self.language_selector = ttk.Combobox(master, values=list(self.languages.values()), state="readonly",
+                                              textvariable=self.language_var)
         self.language_selector.current(0)
         self.language_selector.pack()
         self.language_selector.bind("<<ComboboxSelected>>", self.change_language)
 
-        self.input_label = tk.Label(self, text=self.translate("Enter an expression composed of 'a' and 'b' to convert all symbols to 'a'"))
-        self.input_label.pack()
+        self.editor_label = tk.Label(master, text=self.translate_text("Enter your code to validate with the interpreter:"))
+        self.editor_label.pack(pady=5)
 
-        self.input_entry = tk.Entry(self)
-        self.input_entry.pack()
+        self.editor = scrolledtext.ScrolledText(master, width=40, height=10)
+        self.editor.pack(pady=5)
 
-        self.result_label_text = tk.StringVar()
-        self.result_label_text.set("")
-        self.result_label = tk.Label(self, textvariable=self.result_label_text)
-        self.result_label.pack()
+        self.run_button = tk.Button(master, text=self.translate_text("Run"), command=self.run_code)
+        self.run_button.pack(side=tk.LEFT, padx=5)
 
-        self.button_frame = tk.Frame(self)
-        self.button_frame.pack()
+        self.validate_button = tk.Button(master, text=self.translate_text("Validate"), command=self.validate_code)
+        self.validate_button.pack(side=tk.RIGHT, padx=5)
 
-        self.enter_button = tk.Button(self.button_frame, text=self.translate("Enter Word"), command=self.enter_word)
-        self.enter_button.pack(side=tk.LEFT)
+        self.help_button = tk.Button(master, text=self.translate_text("Help"), command=self.show_help)
+        self.help_button.pack(side=tk.RIGHT, padx=5)
 
-        self.step_button = tk.Button(self.button_frame, text=self.translate("Step"), command=self.step_tape)
-        self.step_button.pack(side=tk.LEFT)
+        self.example_button = tk.Button(master, text=self.translate_text("Show Examples"), command=self.show_examples)
+        self.example_button.pack(side=tk.LEFT, padx=5)
 
-        self.run_button = tk.Button(self.button_frame, text=self.translate("Execute"), command=self.run)
-        self.run_button.pack(side=tk.LEFT)
+        self.result_text = tk.Text(master, height=2, width=40)
+        self.result_text.pack(pady=5)
 
-        self.pause_button = tk.Button(self.button_frame, text=self.translate("Stop"), command=self.pause)
-        self.pause_button.pack(side=tk.LEFT)
+        self.example_labels = []
+        self.example_buttons = []
+        self.examples_frame = tk.Frame(master)
+        self.examples_frame.pack(pady=5)
 
-        self.speed_scale = tk.Scale(self, label=self.translate("Speed"), from_=1, to=10, orient=tk.HORIZONTAL)
-        self.speed_scale.set(5)
-        self.speed_scale.pack()
+        # Show the initial instruction
+        self.show_result(self.translate_text("Enter your code to validate with the interpreter."))
 
-        self.evaluated_symbol = tk.Label(self, text="")
-
-        self.horizontal_scrollbar = ttk.Scrollbar(self, orient=tk.HORIZONTAL, command=self.scroll_canvas)
-        self.horizontal_scrollbar.pack(fill=tk.X, side=tk.BOTTOM)
-
-        self.canvas_frame = tk.Frame(self)
-        self.canvas_frame.pack(fill=tk.BOTH, expand=True)
-
-        self.canvas = tk.Canvas(self.canvas_frame, width=800, height=600, xscrollcommand=self.horizontal_scrollbar.set)
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-
-        self.canvas.bind("<Configure>", self.configure_canvas)
-        self.visualize_turing_machine()
-        self.running = False
-        self.turing_thread = None
-        self.paused = False
-
-    def init_text_to_speech(self):
+        # Inicializar el motor de texto a voz
         self.engine = pyttsx3.init()
 
-    def change_language(self, event):
-        selected_language = list(self.languages.keys())[list(self.languages.values()).index(self.language_selector.get())]
-        self.current_language = selected_language
-        self.update_ui_language()
-        
+    def run_code(self):
+        code = self.editor.get("1.0", tk.END)
+        translated_code = self.translate_code(code)
+        try:
+            parser_result = parser.parse(translated_code, lexer=lexer)
+            result_str = self.translate_text(f"Parser result: {parser_result}")
+            self.show_result(result_str)
+            self.speak(result_str)
+        except Exception as e:
+            error_str = self.translate_text(f"Error during parsing/execution: {e}")
+            self.show_result(error_str)
+            self.speak(error_str)
 
-    def update_ui_language(self):
-        self.language_label.config(text=self.translate("Select a language:"))
-        self.input_label.config(text=self.translate("Enter an expression composed of 'a' and 'b' to convert all symbols to 'a'"))
-        self.enter_button.config(text=self.translate("Enter Word"))
-        self.step_button.config(text=self.translate("Step"))
-        self.run_button.config(text=self.translate("Execute"))
-        self.pause_button.config(text=self.translate("Stop"))
-        speed_label_text = self.translate("Speed")
-        self.speed_scale.config(label=speed_label_text)
+    def validate_code(self):
+        code = self.editor.get("1.0", tk.END)
+        translated_code = self.translate_code(code)
+        try:
+            parser.parse(translated_code, lexer=lexer)
+            result_str = self.translate_text("The code is valid.")
+            self.show_result(result_str)
+            self.speak(result_str)
+        except Exception as e:
+            error_str = self.translate_text(f"Syntax error: {e}")
+            self.show_result(error_str)
+            self.speak(error_str)
 
-    def configure_canvas(self, event):
-        self.canvas.config(scrollregion=self.canvas.bbox("all"))
-
-    def scroll_canvas(self, *args):
-        self.canvas.xview(*args)
-
-    def translate(self, text):
-        translation = self.translator.translate(text, dest=self.current_language)
+    def translate_code(self, code):
+        target_language = self.language_var.get()
+        translation = self.translator.translate(code, dest=target_language)
         return translation.text
 
-    def enter_word(self):
-        input_word = self.input_entry.get()
+    def show_result(self, result):
+        # Clear previous content before showing the new result
+        self.result_text.delete(1.0, tk.END)
+        self.result_text.insert(tk.END, result)
+
+    def show_help(self):
+        help_window = tk.Toplevel(self.master)
+        help_window.title(self.translate_text("Help"))
+
+        help_text = """
+        This is a simple interpreter GUI that allows you to enter and validate code snippets.
         
-        self.turing_machine.initialize_with_input(input_word)
+        Features:
+        - Enter code in the editor and click "Run" or "Validate."
+        - The result will be displayed in the result area.
+        - Click "Help" to view examples and usage instructions.
+        
+        Examples:
+        - Basic arithmetic: x = 10 + y * 5
+        - Conditionals: if x > 0: positive = True else: positive = False
+        - Loops: for i in range(5): print(i)
+        - Functions: def multiply(a, b): return a * b
+        
+        Enjoy coding!
+        """
 
-        self.visualize_turing_machine()
-        self.result_label_text.set(self.translate("A new word has been entered."))
-        self.speak_text_threaded(self.result_label_text.get())  # Utiliza el sintetizador de voz en result_label_text
+        help_label = tk.Label(help_window, text=self.translate_text(help_text), justify=tk.LEFT)
+        help_label.pack(padx=10, pady=10)
 
-    def step_tape(self):
-        if self.turing_machine.current_state != self.turing_machine.accept_state:
-            self.turing_machine.step()
-            self.visualize_turing_machine()
-            self.result_label_text.set(self.translate("A symbol has been processed"))
-            self.speak_text_threaded(self.result_label_text.get())  # Utiliza el sintetizador de voz en result_label_text
+    def show_examples(self):
+        examples = [
+            "x = 10 + y * 5",
+            "result = 2 * (3 + 4)",
+            "a = 5 * (10 - b)",
+            "c = 8 / (2 * d)",
+            "x = 10 * y + z",
+            "invalid = 3 + * 5",
+            "",
+            "# Conditional Example",
+            "if x > 0:",
+            "    positive = True",
+            "else:",
+            "    positive = False",
+            "",
+            "# Loop Example",
+            "for i in range(5):",
+            "    print(i)",
+            "",
+            "# Function Example",
+            "def multiply(a, b):",
+            "    return a * b",
+            "",
+            "result = multiply(3, 4)",
+        ]
 
-    def run(self):
-        self.paused = False
-        if self.turing_machine.current_state != self.turing_machine.accept_state:
-            self.turing_thread = threading.Thread(target=self.turing_thread_function)
-            self.turing_thread.start()
-            
+        # Clear the frame of previous labels and buttons
+        for label, button in zip(self.example_labels, self.example_buttons):
+            label.destroy()
+            button.destroy()
+        self.example_labels = []
+        self.example_buttons = []
 
-    def pause(self):
-        self.paused = True
-        self.result_label_text.set(self.translate("Paused"))
-        self.speak_text_threaded(self.result_label_text.get())  # Utiliza el sintetizador de voz en result_label_text
+        # Show examples in the frame and create buttons
+        for i, example in enumerate(examples):
+            label = tk.Label(self.examples_frame, text=f"Example {i + 1}: {example}")
+            label.grid(row=i, column=0, sticky=tk.W, padx=5)
+            self.example_labels.append(label)
+            button = tk.Button(self.examples_frame, text=f"Use Example {i + 1}", command=lambda ex=example: self.use_example(ex))
+            button.grid(row=i, column=1, padx=5)
+            self.example_buttons.append(button)
 
-    def turing_thread_function(self):
-        while not self.paused and self.turing_machine.current_state != self.turing_machine.accept_state:
-            self.turing_machine.step()
-            self.after(10, self.update_visualization)
-            time.sleep(3 / self.speed_scale.get())
+    def use_example(self, example):
+        # Clear the editor before adding the example
+        self.editor.delete("1.0", tk.END)
+        # Add the example to the editor
+        self.editor.insert(tk.END, example)
+        # Clear the previous result
+        self.show_result("")
 
-            if self.turing_machine.current_state == self.turing_machine.accept_state:
-                self.result_label_text.set(self.translate("The entire word has been changed."))
-                self.speak_text_threaded(self.result_label_text.get()) # Utiliza el sintetizador de voz en result_label_text
+    def change_language(self, event):
+        new_language = next(key for key, value in self.languages.items() if value == self.language_selector.get())
+        print("Language changed to:", new_language)
+        
+        # Cambia el idioma de la instrucción inicial
+        initial_instruction = self.translate_text("Enter your code to validate with the interpreter.")
+        self.show_result(initial_instruction)
 
-    def update_visualization(self):
-        self.visualize_turing_machine()
+        # Cambia el idioma de todos los elementos de la interfaz
+        self.master.title(f"Simple Interpreter GUI - {self.languages[new_language]}")
+        self.language_label.config(text=self.translate_text("Select a language:"))
+        self.editor_label.config(text=self.translate_text("Enter your code to validate with the interpreter:"))
+        self.run_button.config(text=self.translate_text("Run"))
+        self.validate_button.config(text=self.translate_text("Validate"))
+        self.help_button.config(text=self.translate_text("Help"))
+        self.example_button.config(text=self.translate_text("Show Examples"))
 
-    def visualize_turing_machine(self):
-        self.clear_canvas()
-        self.draw_states()
-        self.draw_transitions()
-        self.draw_tape()
+    def translate_text(self, text):
+        target_language = self.language_var.get()
+        translation = self.translator.translate(text, dest=target_language)
+        return translation.text
 
-    def clear_canvas(self):
-        self.canvas.delete("all")
-
-    def draw_states(self):
-        for state in self.turing_machine.states:
-            x, y = self.get_node_coordinates(state)
-            fill_color = "lightgreen" if state == self.turing_machine.current_state else "lightblue"
-            border_width = 3 if state == self.turing_machine.accept_state else 1
-            self.draw_node(x, y, fill_color, state, border_width)
-
-    def draw_node(self, x, y, fill_color, state, border_width):
-        self.canvas.create_oval(x - 20, y - 20, x + 20, y + 20, fill=fill_color, width=border_width)
-        self.canvas.create_text(x, y, text=state)
-
-    def draw_transitions(self):
-        for transition, destination in self.turing_machine.transitions.items():
-            current_state, read_symbol = transition
-            new_state, write_symbol, move_direction = destination
-            current_symbol = self.turing_machine.tape[self.turing_machine.head_position]
-            color = "red" if current_state == self.turing_machine.current_state and read_symbol == current_symbol else "black"
-            transition_label = f"{read_symbol}, {write_symbol}, {move_direction}"
-
-            self.draw_transition(current_state, new_state, transition_label, color)
-
-    def draw_tape(self):
-        tape_text = "".join(self.turing_machine.tape)
-        tape_length = len(tape_text)
-        square_size = 40
-        empty_squares = 20
-
-        head_position = self.turing_machine.head_position
-        start_x = 400 - head_position * square_size
-
-        for i in range(empty_squares):
-            x = start_x - (empty_squares - i) * square_size
-            y = 100
-            self.draw_square(x, y, square_size, '')
-
-        for i, char in enumerate(tape_text):
-            x = start_x + i * square_size
-            y = 100
-            self.draw_square(x, y, square_size, char)
-
-        for i in range(empty_squares):
-            x = start_x + (tape_length + i) * square_size
-            y = 100
-            self.draw_square(x, y, square_size, '')
-
-        self.draw_head_fixed_position()
-        self.canvas.config(scrollregion=self.canvas.bbox("all"))
-        self.horizontal_scrollbar.configure(command=self.scroll_canvas)
-
-    def draw_square(self, x, y, size, char):
-        self.canvas.create_rectangle(x, y, x + size, y + size, outline='black')
-        self.canvas.create_text(x + size // 2, y + size // 2, text=char, font=('Helvetica', 12), anchor=tk.CENTER)
-
-    def draw_head_fixed_position(self):
-        x = 420
-        y = 100
-        self.canvas.create_polygon(x, y, x - 10, y - 20, x + 10, y - 20, fill='red')
-
-    def draw_transition(self, current_state, new_state, label, color):
-        x1, y1 = self.get_node_coordinates(current_state)
-        x2, y2 = self.get_node_coordinates(new_state)
-
-        if current_state == new_state:
-            self.canvas.create_arc(x1 - 30, y1 - 30, x1 + 30, y1 + 30, start=180, extent=-180, style=tk.ARC)
-            self.canvas.create_line(x1 - 40, y1, x1 - 20, y1, arrow=tk.LAST)
-        else:
-            self.canvas.create_line(x1 + 20, y1, x2 - 20, y2, arrow=tk.LAST)
-
-        label_x, label_y = self.calculate_label_position(x1, y1, x2, y2)
-        self.canvas.create_text(label_x, label_y, text=label, fill=color)
-
-    def calculate_label_position(self, x1, y1, x2, y2):
-        label_x = (x1 + x2) / 2
-        label_y = y1 - 30
-
-        overlapping_labels = self.canvas.find_overlapping(label_x - 10, label_y - 10, label_x + 10, label_y + 10)
-
-        while overlapping_labels:
-            label_y -= 10
-            overlapping_labels = self.canvas.find_overlapping(label_x - 10, label_y - 10, label_x + 10, label_y + 10)
-
-        return label_x, label_y
-
-    def get_node_coordinates(self, state):
-        state_number = int(state[1:])
-        x = 100 + state_number * 150
-        y = 300
-        return x, y
-
-    def speak_text(self, text):
+    def speak(self, text):
         self.engine.say(text)
-        self.after(10, self.engine.runAndWait)
+        self.master.after(10, self.engine.runAndWait)
 
-    def speak_text_threaded(self, text):
-        self.after(10, lambda: self.speak_text(text))
+def main():
+    root = tk.Tk()
+    app = SimpleInterpreterGUI(root)
+    root.mainloop()
 
 if __name__ == "__main__":
-    turing_machine = TuringMachine()
-    app = TuringMachineGUI(turing_machine)
-    app.mainloop()
+    main()
